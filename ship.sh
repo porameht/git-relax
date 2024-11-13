@@ -42,11 +42,26 @@ generate_pr_info() {
     pr_title="$pr_title_prefix: $pr_summary"
 
     gum style --foreground 212 "Generating Pull Request body..."
-    pr_body=$(git diff "$default_branch".. | mods -f "Create a detailed PR description that includes: 
-    - The main changes made
-    - Why these changes were necessary
-    - Any important implementation details
-    Keep it clear and concise." --max-tokens 400)
+    
+    # Create sections for the PR template
+    local problems changes solutions
+
+    problems=$(git diff "$default_branch".. | mods -f "Describe the problems or issues that needed to be addressed. Focus on why these changes were necessary." --max-tokens 200)
+    solutions=$(git diff "$default_branch".. | mods -f "Explain the solutions implemented to address the problems. Include important technical details and implementation choices." --max-tokens 200)
+    changes=$(git diff "$default_branch".. | mods -f "Create a bullet-point list of the main changes made in this PR. Each point should be concise and start with a verb in present tense." --max-tokens 200)
+
+    # Construct the PR body using the template
+    pr_body="### Problems
+
+$problems
+
+### Solutions
+
+$solutions
+
+### Changes
+
+$changes"
 
     gh pr create \
         --title "$pr_title" \

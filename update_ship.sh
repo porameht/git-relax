@@ -1,7 +1,5 @@
-# Create directory if it doesn't exist
-mkdir -p ~/.local/bin
 
-# Create file and write content
+# อัพเดทไฟล์
 cat > ~/.local/bin/ship << 'EOL'
 #!/bin/bash
 
@@ -77,8 +75,8 @@ $changes"
 generate_pr_info
 EOL
 
-# Make script executable
+# ให้สิทธิ์การรันอีกครั้ง (เผื่อสิทธิ์หาย)
 chmod +x ~/.local/bin/ship
 
-# Show confirmation message
-echo "Script has been created at ~/.local/bin/ship and is now executable"
+# แสดงข้อความยืนยัน
+echo "Script has been updated at ~/.local/bin/ship"
