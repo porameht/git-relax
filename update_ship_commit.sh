@@ -1,3 +1,6 @@
+
+# อัพเดทไฟล์
+cat > ~/.local/bin/ship << 'EOL'
 #!/bin/bash
 
 # Exit on error
@@ -20,49 +23,6 @@ done
 get_default_branch() {
     git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
 }
-
-# Generate commit message using conventional commits format
-# generate_commit_message() {
-#     local type scope message
-
-#     # Get the diff and generate commit message using mods
-#     message=$(git diff --cached | mods "Generate a concise git commit message in imperative tense. First word should start with a lowercase letter. Do not include any type prefix.")
-    
-#     # Using the Conventional Commit format
-#     type=$(gum choose "fix" "feat" "docs" "style" "refactor" "test" "chore" "revert")
-#     scope=$(gum input --placeholder "scope")
-
-#     # Since the scope is optional, wrap it in parentheses if it has a value.
-#     [ -n "$scope" ] && scope="($scope)"
-
-#     echo "$type$scope: $message"
-# }
-
-# generate_commit_message() {
-#     local type scope message
-
-#     # Get the diff and generate commit message using mods
-#     message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
-    
-#     # Extract title from potentially multi-line message
-#     title=$(echo "$message" | head -n1)
-#     description=$(echo "$message" | tail -n+3)
-
-#     # Using the Conventional Commit format
-#     type=$(gum choose "fix" "feat" "build" "chore" "ci" "docs" "style" "refactor" "perf" "test")
-#     scope=$(gum input --placeholder "scope")
-
-#     # Since the scope is optional, wrap it in parentheses if it has a value.
-#     [ -n "$scope" ] && scope="($scope)"
-
-#     if [ -n "$description" ]; then
-#         echo "$type$scope: $title"
-#         echo
-#         echo "$description"
-#     else
-#         echo "$type$scope: $title"
-#     fi
-# }
 
 generate_commit_message() {
     local message
@@ -128,3 +88,10 @@ if [ "$1" = "commit" ]; then
 else
     generate_pr_info
 fi
+EOL
+
+# ให้สิทธิ์การรันอีกครั้ง (เผื่อสิทธิ์หาย)
+chmod +x ~/.local/bin/ship
+
+# แสดงข้อความยืนยัน
+echo "Script has been updated at ~/.local/bin/ship"
