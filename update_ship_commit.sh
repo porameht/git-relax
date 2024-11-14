@@ -22,7 +22,6 @@ done
 get_default_branch() {
     git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
 }
-
 generate_commit_message() {
     local commit_message
 
@@ -41,6 +40,12 @@ generate_commit_message() {
     fi
 
     echo "$commit_message"
+
+    if gum confirm "Do you want to push this commit now?"; then 
+        git commit -m "$commit_message"
+    elif gum confirm "Do you want to regenerate the commit message?"; then
+        generate_commit_message
+    fi
 }
 
 # Generate PR title and body
@@ -85,10 +90,6 @@ generate_pr_info() {
 
     $changes"
 
-    # gh pr create \
-    #         --title "$pr_title" \
-    #         --body "$pr_body"
-
     echo "Previewing Pull Request:"
     echo "Title: $pr_title"
     echo "Body: $pr_body"
@@ -102,9 +103,8 @@ fi
 }
 
 # Main script execution starts here
-if [ "$1" = "commit" ]; then
-    commit_msg=$(generate_commit_message)
-    git commit -m "$commit_msg"
+if [ "$1" = "cm" ]; then
+    generate_commit_message
 else
     generate_pr_info
 fi
