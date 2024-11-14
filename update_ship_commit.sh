@@ -25,13 +25,23 @@ get_default_branch() {
 }
 
 generate_commit_message() {
-    local message
+    local commit_message
 
-    # Get the diff and generate commit message using mods
-    message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
+    # select type
+    type=$(gum choose "message_long_more_lines" "message_long_single_line" "message_short" "message_brief")
 
-    # Just output the message directly
-    echo "$message"
+    if [ "$type" == "message_long_more_lines" ]; then
+        commit_message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
+    elif [ "$type" == "message_long_single_line" ]; then
+        # Get the diff and generate commit message using mods
+        commit_message=$(git diff --cached | mods "You are an expert software engineer. Review the diffs and generate a commit message that starts with one of these types: fix, feat, build, chore, ci, docs, style, refactor, perf, test. Format must be '<type>: <short message> - <optional detailed description>'. Keep everything on a single line using a hyphen to separate description. Use imperative tense. Reply with only the commit message.")
+    elif [ "$type" == "message_short" ]; then
+        commit_message=$(git diff --cached | mods "You are an expert software engineer. Generate a commit message for the changes. The commit message MUST use the imperative tense starting with a type prefix from this list: fix, feat, build, chore, ci, docs, style, refactor, perf, test. Format should be <type>: <short message>. Keep it concise and meaningful. DO NOT add line breaks or descriptions.")
+    elif [ "$type" == "message_brief" ]; then
+        commit_message=$(git diff --cached | mods "Generate a concise commit message in format '<type>: <message> - <brief context>' where type is fix/feat/build/chore/ci/docs/style/refactor/perf/test. Use imperative tense. Describe core change in 3-5 words, add essential context after hyphen if needed.")
+    fi
+
+    echo "$commit_message"
 }
 
 # Generate PR title and body
