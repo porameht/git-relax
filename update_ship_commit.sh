@@ -1,4 +1,3 @@
-
 # อัพเดทไฟล์
 cat > ~/.local/bin/ship << 'EOL'
 #!/bin/bash
@@ -65,13 +64,13 @@ generate_pr_info() {
     pr_title="$pr_title_prefix: $pr_summary"
 
     gum style --foreground 212 "Generating Pull Request body..."
-    
+
     # Create sections for the PR template
     local problems changes solutions
 
-    problems=$(git diff "$default_branch".. | mods -f "Describe the problems or issues that needed to be addressed. Focus on why these changes were necessary." --max-tokens 200)
-    solutions=$(git diff "$default_branch".. | mods -f "Explain the solutions implemented to address the problems. Include important technical details and implementation choices." --max-tokens 200)
-    changes=$(git diff "$default_branch".. | mods -f "Create a bullet-point list of the main changes made in this PR. Each point should be concise and start with a verb in present tense." --max-tokens 200)
+    problems=$(git diff "$default_branch".. | mods "Describe the problems or issues that needed to be addressed. Focus on why these changes were necessary.")
+    solutions=$(git diff "$default_branch".. | mods "Explain the solutions implemented to address the problems. Include important technical details and implementation choices.")
+    changes=$(git diff "$default_branch".. | mods "Create a bullet-point list of the main changes made in this PR. Each point should be concise and start with a verb in present tense.")
 
     # Construct the PR body using the template
     pr_body="### Problems
@@ -86,9 +85,15 @@ $solutions
 
 $changes"
 
-    gh pr create \
-        --title "$pr_title" \
-        --body "$pr_body"
+    echo "Previewing Pull Request:"
+    echo "Title: $pr_title"
+    echo "Body: $pr_body"
+
+    response=$(gum confirm "Do you want to push this PR now?")
+    if [ "$response" = true ]; then
+        gh pr create --title "$pr_title" --body "$pr_body"
+        echo "Pull Request has been created!"
+    fi
 }
 
 # Main script execution starts here
