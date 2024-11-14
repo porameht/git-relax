@@ -75,27 +75,30 @@ generate_pr_info() {
     # Construct the PR body using the template
     pr_body="### Problems
 
-$problems
+    $problems
 
-### Solutions
+    ### Solutions
 
-$solutions
+    $solutions
 
-### Changes
+    ### Changes
 
-$changes"
+    $changes"
+
+    # gh pr create \
+    #         --title "$pr_title" \
+    #         --body "$pr_body"
 
     echo "Previewing Pull Request:"
     echo "Title: $pr_title"
-    echo "Body: $pr_body
-    
-    response=$(gum confirm "Do you want to push this PR now?")
-    if [ "$response" = true ]; then
-        gh pr create \
-            --title "$pr_title" \
-            --body "$pr_body"        
-        echo "Pull Request has been created!"
-    fi
+    echo "Body: $pr_body"
+
+    if gum confirm "Do you want to push this PR now?"; then
+    gh pr create \
+        --title "$pr_title" \
+        --body "$pr_body"        
+    echo "Pull Request has been created!"
+fi
 }
 
 # Main script execution starts here
