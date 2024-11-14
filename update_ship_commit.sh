@@ -80,15 +80,15 @@ generate_pr_info() {
     # Construct the PR body using the template
     pr_body="### Problems
 
-    $problems
+$problems
 
-    ### Solutions
+### Solutions
 
-    $solutions
+$solutions
 
-    ### Changes
+### Changes
 
-    $changes"
+$changes"
 
     echo "Previewing Pull Request:"
     echo "Title: $pr_title"
