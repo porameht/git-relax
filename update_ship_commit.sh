@@ -89,9 +89,13 @@ $changes"
     echo "Title: $pr_title"
     echo "Body: $pr_body"
 
+
+
     response=$(gum confirm "Do you want to push this PR now?")
     if [ "$response" = true ]; then
-        gh pr create --title "$pr_title" --body "$pr_body"
+        gh pr create \
+            --title "$pr_title" \
+            --body "$pr_body"
         echo "Pull Request has been created!"
     fi
 }
