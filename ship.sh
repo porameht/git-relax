@@ -21,57 +21,164 @@ get_default_branch() {
     git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
 }
 
-# Generate commit message using conventional commits format
-# generate_commit_message() {
-#     local type scope message
+# Generate mods rules for commit message formatting
+get_commit_rules() {
+    local type="$1"
+    local scope="$2"
+    local breaking_change="$3"
 
-#     # Get the diff and generate commit message using mods
-#     message=$(git diff --cached | mods "Generate a concise git commit message in imperative tense. First word should start with a lowercase letter. Do not include any type prefix.")
-    
-#     # Using the Conventional Commit format
-#     type=$(gum choose "fix" "feat" "docs" "style" "refactor" "test" "chore" "revert")
-#     scope=$(gum input --placeholder "scope")
+    case "$type" in
+    "message_conventional")
+        echo "rules:
+  - use_types:
+      - fix: for patches/bugs
+      - feat: for new features
+      - build
+      - chore
+      - ci
+      - docs
+      - style
+      - refactor
+      - perf
+      - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - breaking_change:
+      if_present: add 'BREAKING CHANGE: <description>' in footer
+  - title:
+      style: imperative mood
+      length: <50 chars
+  - body:
+      optional: true
+      position: after blank line
+      wrap: 72 chars
+  - content:
+      focus: what and why, not how
+output: formatted commit message only"
+        ;;
+    "message_long_more_lines")
+        echo "rules:
+  - type:
+      prefix:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - description:
+      position: after blank line
+      style: detailed
+  - content:
+      mood: imperative
+      include:
+        - context
+        - reasoning
+output: formatted message only"
+        ;;
+    "message_short")
+        echo "rules:
+  - type:
+      options:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - style: imperative mood
+  - title_length: max 50 chars
+output: single-line message only"
+        ;;
+    *)
+        echo "rules:
+  - format: '<type>${scope}${breaking_change}: <message>'
+  - type:
+      options:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - style: imperative tense
+  - length: max 50 chars
+output: formatted message only"
+        ;;
+    esac
+}
 
-#     # Since the scope is optional, wrap it in parentheses if it has a value.
-#     [ -n "$scope" ] && scope="($scope)"
-
-#     echo "$type$scope: $message"
-# }
-
-# generate_commit_message() {
-#     local type scope message
-
-#     # Get the diff and generate commit message using mods
-#     message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
-    
-#     # Extract title from potentially multi-line message
-#     title=$(echo "$message" | head -n1)
-#     description=$(echo "$message" | tail -n+3)
-
-#     # Using the Conventional Commit format
-#     type=$(gum choose "fix" "feat" "build" "chore" "ci" "docs" "style" "refactor" "perf" "test")
-#     scope=$(gum input --placeholder "scope")
-
-#     # Since the scope is optional, wrap it in parentheses if it has a value.
-#     [ -n "$scope" ] && scope="($scope)"
-
-#     if [ -n "$description" ]; then
-#         echo "$type$scope: $title"
-#         echo
-#         echo "$description"
-#     else
-#         echo "$type$scope: $title"
-#     fi
-# }
-
+# Generate commit message
 generate_commit_message() {
-    local message
+    local commit_message
+    local breaking_change=""
+    local scope=""
 
-    # Get the diff and generate commit message using mods
-    message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
+    # Select message type
+    local type=$(gum choose "message_conventional" "message_long_more_lines" "message_long_single_line")
 
-    # Just output the message directly
-    echo "$message"
+    # Ask about breaking changes
+    if gum confirm "Does this commit contain breaking changes?"; then
+        breaking_change="!"
+    fi
+
+    # Optional scope
+    scope=$(gum input --placeholder "Enter scope (optional)")
+    [ -n "$scope" ] && scope="($scope)"
+
+    # Get rules and generate commit message
+    local rules=$(get_commit_rules "$type" "$scope" "$breaking_change")
+    commit_message=$(git diff --cached | mods "$rules")
+
+    echo "$commit_message"
+
+    if gum confirm "Do you want to push this commit now?"; then
+        git commit -m "$commit_message"
+    elif gum confirm "Do you want to regenerate the commit message?"; then
+        generate_commit_message
+    fi
+}
+
+# Generate PR rules for mods
+get_pr_rules() {
+    local rule_type="$1"
+
+    case "$rule_type" in
+    "title")
+        echo "rules:
+  - content: concise PR title describing main change
+  - style: start with lowercase verb"
+        ;;
+    "problems")
+        echo "task: describe PR problem
+style:
+  - brief
+  - clear"
+        ;;
+    "solutions")
+        echo "task: describe solution
+output: solution only"
+        ;;
+    "changes")
+        echo "task: list main changes
+style:
+  - use present-tense verbs
+  - specific but concise"
+        ;;
+    esac
 }
 
 # Generate PR title and body
@@ -84,24 +191,20 @@ generate_pr_info() {
     # Using the Conventional Commit format
     type=$(gum choose "fix" "feat" "docs" "style" "refactor" "test" "chore" "revert")
     scope=$(gum input --placeholder "scope")
-
-    # Since the scope is optional, wrap it in parentheses if it has a value.
     [ -n "$scope" ] && scope="($scope)"
 
     pr_title_prefix="$type$scope"
 
-    gum style --foreground 212 "Generating Pull Request title..."
-    pr_summary=$(git diff "$default_branch".. | mods "create a concise Pull Request title that describes the main change. First word should start with a lowercase letter")
+    gum style --foreground 212 "Generating PR title..."
+    pr_summary=$(git diff "$default_branch".. | mods "$(get_pr_rules "title")")
     pr_title="$pr_title_prefix: $pr_summary"
 
-    gum style --foreground 212 "Generating Pull Request body..."
-    
-    # Create sections for the PR template
-    local problems changes solutions
+    gum style --foreground 212 "Generating PR body..."
 
-    problems=$(git diff "$default_branch".. | mods -f "Describe the problems or issues that needed to be addressed. Focus on why these changes were necessary." --max-tokens 200)
-    solutions=$(git diff "$default_branch".. | mods -f "Explain the solutions implemented to address the problems. Include important technical details and implementation choices." --max-tokens 200)
-    changes=$(git diff "$default_branch".. | mods -f "Create a bullet-point list of the main changes made in this PR. Each point should be concise and start with a verb in present tense." --max-tokens 200)
+    # Create sections for the PR template
+    local problems=$(git diff "$default_branch".. | mods "$(get_pr_rules "problems")")
+    local solutions=$(git diff "$default_branch".. | mods "$(get_pr_rules "solutions")")
+    local changes=$(git diff "$default_branch".. | mods "$(get_pr_rules "changes")")
 
     # Construct the PR body using the template
     pr_body="### Problems
@@ -116,15 +219,21 @@ $solutions
 
 $changes"
 
-    gh pr create \
-        --title "$pr_title" \
-        --body "$pr_body"
+    echo "Previewing Pull Request:"
+    echo "Title: $pr_title"
+    echo "Body: $pr_body"
+
+    if gum confirm "Do you want to push this PR now?"; then
+        gh pr create \
+            --title "$pr_title" \
+            --body "$pr_body"
+        echo "Pull Request has been created!"
+    fi
 }
 
 # Main script execution starts here
-if [ "$1" = "commit" ]; then
-    commit_msg=$(generate_commit_message)
-    git commit -m "$commit_msg"
+if [ "$1" = "cm" ]; then
+    generate_commit_message
 else
     generate_pr_info
 fi
