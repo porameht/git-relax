@@ -1,4 +1,4 @@
-# อัพเดทไฟล์
+# update ship commit message
 cat > ~/.local/bin/ship << 'EOL'
 #!/bin/bash
 
@@ -42,34 +42,95 @@ generate_commit_message() {
     [ -n "$scope" ] && scope="($scope)"
 
     if [ "$type" == "message_conventional" ]; then
-        commit_message=$(git diff --cached | mods "Generate a commit message following these rules:
-        1. Use one of these types: fix (for patches/bugs), feat (for new features), build, chore, ci, docs, style, refactor, perf, test
-        2. Format: <type>${scope}${breaking_change}: <title>
-        3. If breaking_change is present, add 'BREAKING CHANGE: <description>' in the footer
-        4. Use imperative mood in the title
-        5. Optionally add detailed description after a blank line
-        6. Keep title concise (<50 chars)
-        7. Wrap body at 72 chars
-        8. Explain the what and why, not the how
-        Only output the formatted commit message.")
+        commit_message=$(git diff --cached | mods "
+rules:
+  - use_types:
+      - fix: for patches/bugs
+      - feat: for new features
+      - build
+      - chore
+      - ci
+      - docs
+      - style
+      - refactor
+      - perf
+      - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - breaking_change:
+      if_present: add 'BREAKING CHANGE: <description>' in footer
+  - title:
+      style: imperative mood
+      length: <50 chars
+  - body:
+      optional: true
+      position: after blank line
+      wrap: 72 chars
+  - content:
+      focus: what and why, not how
+output: formatted commit message only")
     elif [ "$type" == "message_long_more_lines" ]; then
-        commit_message=$(git diff --cached | mods "Generate a detailed commit message with:
-        1. Type prefix: fix/feat/build/chore/ci/docs/style/refactor/perf/test
-        2. Format: <type>${scope}${breaking_change}: <title>
-        3. Follow with detailed description after blank line
-        4. Use imperative mood
-        5. Explain context and reasoning
-        Only output the formatted message.")
+        commit_message=$(git diff --cached | mods "
+rules:
+  - type:
+      prefix:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - description:
+      position: after blank line
+      style: detailed
+  - content:
+      mood: imperative
+      include:
+        - context
+        - reasoning
+output: formatted message only")
     elif [ "$type" == "message_short" ]; then
-        commit_message=$(git diff --cached | mods "Generate a concise commit message:
-        1. Use type: fix/feat/build/chore/ci/docs/style/refactor/perf/test
-        2. Format: <type>${scope}${breaking_change}: <title>
-        3. Use imperative mood
-        4. Max 50 chars for title
-        Only output the single-line message.")
+        commit_message=$(git diff --cached | mods "
+rules:
+  - type:
+      options:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - format: '<type>${scope}${breaking_change}: <title>'
+  - style: imperative mood
+  - title_length: max 50 chars
+output: single-line message only")
     else
-        
-        commit_message=$(git diff --cached | mods "Generate a concise commit message in format <type>${scope}${breaking_change}: <message> where type is fix/feat/build/chore/ci/docs/style/refactor/perf/test. Use imperative tense. Max 50 chars.")
+        commit_message=$(git diff --cached | mods "
+rules:
+  - format: '<type>${scope}${breaking_change}: <message>'
+  - type:
+      options:
+        - fix
+        - feat
+        - build
+        - chore
+        - ci
+        - docs
+        - style
+        - refactor
+        - perf
+        - test
+  - style: imperative tense
+  - length: max 50 chars
+output: formatted message only")
     fi
 
     echo "$commit_message"
@@ -98,7 +159,10 @@ generate_pr_info() {
     pr_title_prefix="$type$scope"
 
     gum style --foreground 212 "Generating PR title..."
-    pr_summary=$(git diff "$default_branch".. | mods "Generate a concise PR title describing the main change. Start with lowercase verb.")
+    pr_summary=$(git diff "$default_branch".. | mods "
+rules:
+  - content: concise PR title describing main change
+  - style: start with lowercase verb")
     pr_title="$pr_title_prefix: $pr_summary"
 
     gum style --foreground 212 "Generating PR body..."
@@ -106,9 +170,19 @@ generate_pr_info() {
     # Create sections for the PR template with more concise prompts
     local problems changes solutions
 
-    problems=$(git diff "$default_branch".. | mods "What problem does this PR solve? Be brief but clear.")
-    solutions=$(git diff "$default_branch".. | mods "How does this PR solve the problem? only answer with the solution")
-    changes=$(git diff "$default_branch".. | mods "List main changes using present-tense verbs. Be specific but concise.")
+    problems=$(git diff "$default_branch".. | mods "
+task: describe PR problem
+style:
+  - brief
+  - clear")
+    solutions=$(git diff "$default_branch".. | mods "
+task: describe solution
+output: solution only")
+    changes=$(git diff "$default_branch".. | mods "
+task: list main changes
+style:
+  - use present-tense verbs
+  - specific but concise")
 
     # Construct the PR body using the template
     pr_body="### Problems
