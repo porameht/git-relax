@@ -141,7 +141,7 @@ generate_commit_message() {
     local type=$(gum choose "🔨 message_conventional" "🔨 message_long_more_lines" "🔨 message_long_single_line")
 
     # Ask about breaking changes
-    if gum confirm "Does this commit contain breaking changes?"; then
+    if gum confirm "🚨 Does this commit contain breaking changes?"; then
         breaking_change="!"
     fi
 
@@ -155,9 +155,9 @@ generate_commit_message() {
 
     echo "$commit_message"
 
-    if gum confirm "Do you want to push this commit now?"; then
+    if gum confirm "👨‍💻 Do you want to commit now?"; then
         git commit -m "$commit_message"
-    elif gum confirm "Do you want to regenerate the commit message?"; then
+    elif gum confirm "👨‍💻 Do you want to regenerate the commit message?"; then
         generate_commit_message
     fi
 }
