@@ -25,20 +25,51 @@ get_default_branch() {
 
 generate_commit_message() {
     local commit_message
+    local breaking_change
 
-    # select type
-    type=$(gum choose "message_long_more_lines" "message_long_single_line" "message_short" "message_brief" "message_short_single_line")
+    # Select message type
+    type=$(gum choose "message_conventional" "message_long_more_lines" "message_long_single_line")
 
-    if [ "$type" == "message_long_more_lines" ]; then
-        commit_message=$(git diff --cached | mods "You are an expert software engineer.Review the provided context and diffs which are about to be committed to a git repo.Review the diffs carefully.Generate a commit message for those changes.The commit message MUST use the imperative tense.The commit message should be structured as follows: <type>: <title>The commit message can come with an optional description after the title with a blank line.Remember don't make the title too long.Use these for <type>: fix, feat, build, chore, ci, docs, style, refactor, perf, testReply with JUST the commit message, without quotes, comments, questions, etc!")
-    elif [ "$type" == "message_long_single_line" ]; then
-        commit_message=$(git diff --cached | mods "You are an expert software engineer. Review the diffs and generate a commit message that starts with one of these types: fix, feat, build, chore, ci, docs, style, refactor, perf, test. Format must be <type>: <short message> - <optional detailed description>. Keep everything on a single line using a hyphen to separate description. Use imperative tense. Reply with only the commit message.")
+    # Ask about breaking changes
+    if gum confirm "Does this commit contain breaking changes?"; then
+        breaking_change="!"
+    else
+        breaking_change=""
+    fi
+
+    # Optional scope
+    scope=$(gum input --placeholder "Enter scope (optional)")
+    [ -n "$scope" ] && scope="($scope)"
+
+    if [ "$type" == "message_conventional" ]; then
+        commit_message=$(git diff --cached | mods "Generate a commit message following these rules:
+        1. Use one of these types: fix (for patches/bugs), feat (for new features), build, chore, ci, docs, style, refactor, perf, test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. If breaking_change is present, add 'BREAKING CHANGE: <description>' in the footer
+        4. Use imperative mood in the title
+        5. Optionally add detailed description after a blank line
+        6. Keep title concise (<50 chars)
+        7. Wrap body at 72 chars
+        8. Explain the what and why, not the how
+        Only output the formatted commit message.")
+    elif [ "$type" == "message_long_more_lines" ]; then
+        commit_message=$(git diff --cached | mods "Generate a detailed commit message with:
+        1. Type prefix: fix/feat/build/chore/ci/docs/style/refactor/perf/test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. Follow with detailed description after blank line
+        4. Use imperative mood
+        5. Explain context and reasoning
+        Only output the formatted message.")
     elif [ "$type" == "message_short" ]; then
-        commit_message=$(git diff --cached | mods "You are an expert software engineer. Generate a commit message for the changes. The commit message MUST use the imperative tense starting with a type prefix from this list: fix, feat, build, chore, ci, docs, style, refactor, perf, test. Format should be <type>: <short message>. Keep it concise and meaningful. DO NOT add line breaks or descriptions.")
-    elif [ "$type" == "message_brief" ]; then
-        commit_message=$(git diff --cached | mods "Generate a concise commit message in format <type>: <message> - <brief context> where type is fix/feat/build/chore/ci/docs/style/refactor/perf/test. Use imperative tense. Describe core change in 3-5 words, add essential context after hyphen if needed.")
-    elif [ "$type" == "message_short_single_line" ]; then
-        commit_message=$(git diff --cached | mods "Generate a concise PR title describing the main change. Start with lowercase verb. The commit message MUST use the imperative tense starting with a type prefix from this list: fix, feat, build, chore, ci, docs, style, refactor, perf, test. Format should be <type>: <short message>. Keep it concise and meaningful.")
+        commit_message=$(git diff --cached | mods "Generate a concise commit message:
+        1. Use type: fix/feat/build/chore/ci/docs/style/refactor/perf/test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. Use imperative mood
+        4. Max 50 chars for title
+        Only output the single-line message.")
+    else
+        
+        commit_message=$(git diff --cached | mods "Generate a concise commit message in format <type>${scope}${breaking_change}: <message> where type is fix/feat/build/chore/ci/docs/style/refactor/perf/test. Use imperative tense. Max 50 chars.")
     fi
 
     echo "$commit_message"
