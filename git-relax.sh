@@ -1,12 +1,13 @@
 # Check if ship file exists
-if [ -f ~/.local/bin/ship ]; then
-    echo "😆 Updating existing ship script..."
+if [ -f ~/.local/bin/git-relax ]; then
+    echo "😆 Updating existing git-relax script..."
 else
-    echo "🚀 Creating new ship script..."
+    echo "🚀 Creating new git-relax script..."
     mkdir -p ~/.local/bin
 fi
 
-cat >~/.local/bin/ship <<'EOL'
+# Create git-relax script
+cat >~/.local/bin/git-relax <<'EOL'
 #!/bin/bash
 
 # Exit on error
@@ -140,7 +141,7 @@ generate_commit_message() {
     local type=$(gum choose "🔨 message_conventional" "🔨 message_long_more_lines" "🔨 message_long_single_line")
 
     # Ask about breaking changes
-    if gum confirm "Does this commit contain breaking changes?"; then
+    if gum confirm "🚨 Does this commit contain breaking changes?"; then
         breaking_change="!"
     fi
 
@@ -154,9 +155,9 @@ generate_commit_message() {
 
     echo "$commit_message"
 
-    if gum confirm "Do you want to push this commit now?"; then
+    if gum confirm "👨‍💻 Do you want to commit now?"; then
         git commit -m "$commit_message"
-    elif gum confirm "Do you want to regenerate the commit message?"; then
+    elif gum confirm "👨‍💻 Do you want to regenerate the commit message?"; then
         generate_commit_message
     fi
 }
@@ -241,19 +242,26 @@ $changes"
 }
 
 # Main script execution starts here
-if [ "$1" = "cm" ]; then
+if [ "$1" = "commit" ]; then
     generate_commit_message
-else
+elif [ "$1" = "pr" ]; then
     generate_pr_info
+else
+    echo "🚨 Invalid command. Usage: git-relax or git-r commit|pr"
 fi
 EOL
 
 # Make script executable
-chmod +x ~/.local/bin/ship
+chmod +x ~/.local/bin/git-relax
+
+# Create symlink for git-r
+ln -sf ~/.local/bin/git-relax ~/.local/bin/git-r
 
 # Show confirmation message
-if [ -f ~/.local/bin/ship ]; then
-    echo "🎉 Script has been updated at ~/.local/bin/ship"
+if [ -f ~/.local/bin/git-relax ]; then
+    echo "🎉 Script has been updated at ~/.local/bin/git-relax"
+    echo "🔗 Symlink created at ~/.local/bin/git-r"
 else
-    echo "🎉 Script has been created at ~/.local/bin/ship"
+    echo "🎉 Script has been created at ~/.local/bin/git-relax"
+    echo "🔗 Symlink created at ~/.local/bin/git-r"
 fi
