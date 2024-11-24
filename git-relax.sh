@@ -38,95 +38,38 @@ get_commit_rules() {
     local breaking_change="$3"
 
     case "$type" in
-        "message_conventional")
-            echo "rules:
-  - use_types:
-      - fix: for patches/bugs
-      - feat: for new features
-      - build
-      - chore
-      - ci
-      - docs
-      - style
-      - refactor
-      - perf
-      - test
-  - format: '<type>${scope}${breaking_change}: <title>'
-  - breaking_change:
-      if_present: add 'BREAKING CHANGE: <description>' in footer
-  - title:
-      style: imperative mood
-      length: <50 chars
-  - body:
-      optional: true
-      position: after blank line
-      wrap: 72 chars
-  - content:
-      focus: what and why, not how
-output: formatted commit message only"
+        "🔨 message_conventional")
+            echo "Generate a commit message following these rules:
+        1. Use one of these types: fix (for patches/bugs), feat (for new features), build, chore, ci, docs, style, refactor, perf, test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. If breaking_change is present, add 'BREAKING CHANGE: <description>' in the footer
+        4. Use imperative mood in the title
+        5. Optionally add detailed description after a blank line
+        6. Keep title concise (<50 chars)
+        7. Wrap body at 72 chars
+        8. Explain the what and why, not the how
+        Only output the formatted commit message."
             ;;
-        "message_long_more_lines")
-            echo "rules:
-  - type:
-      prefix:
-        - fix
-        - feat
-        - build
-        - chore
-        - ci
-        - docs
-        - style
-        - refactor
-        - perf
-        - test
-  - format: '<type>${scope}${breaking_change}: <title>'
-  - description:
-      position: after blank line
-      style: detailed
-  - content:
-      mood: imperative
-      include:
-        - context
-        - reasoning
-output: formatted message only"
+        "🔨 message_long_more_lines")
+            echo "Generate a detailed commit message with:
+        1. Type prefix: fix/feat/build/chore/ci/docs/style/refactor/perf/test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. Follow with detailed description after blank line
+        4. Use imperative mood
+        5. Explain context and reasoning
+        Only output the formatted message."
             ;;
-        "message_short")
-            echo "rules:
-  - type:
-      options:
-        - fix
-        - feat
-        - build
-        - chore
-        - ci
-        - docs
-        - style
-        - refactor
-        - perf
-        - test
-  - format: '<type>${scope}${breaking_change}: <title>'
-  - style: imperative mood
-  - title_length: max 50 chars
-output: single-line message only"
+        "🔨 message_long_single_line")
+            echo "Generate a concise commit message:
+        1. Use type: fix/feat/build/chore/ci/docs/style/refactor/perf/test
+        2. Format: <type>${scope}${breaking_change}: <title>
+        3. Use imperative mood
+        4. Max 50 chars for title
+        Only output the single-line message."
             ;;
         *)
-            echo "rules:
-  - format: '<type>${scope}${breaking_change}: <message>'
-  - type:
-      options:
-        - fix
-        - feat
-        - build
-        - chore
-        - ci
-        - docs
-        - style
-        - refactor
-        - perf
-        - test
-  - style: imperative tense
-  - length: max 50 chars
-output: formatted message only"
+            echo "Generate a concise commit message in format <type>${scope}${breaking_change}: <message> where type is fix/feat/build/chore/ci/docs/style/refactor/perf/test. Use imperative tense. Max 50 chars."
+            echo "Debug: type=$type, scope=$scope, breaking_change=$breaking_change"
             ;;
     esac
 }
@@ -247,21 +190,16 @@ if [ "$1" = "commit" ]; then
 elif [ "$1" = "pr" ]; then
     generate_pr_info
 else
-    echo "🚨 Invalid command. Usage: git-relax or git-r commit|pr"
+    echo "🚨 Invalid command. Usage: git-relax commit|pr"
 fi
 EOL
 
 # Make script executable
 chmod +x ~/.local/bin/git-relax
 
-# Create symlink for git-r
-ln -sf ~/.local/bin/git-relax ~/.local/bin/git-r
-
 # Show confirmation message
 if [ -f ~/.local/bin/git-relax ]; then
     echo "🎉 Script has been updated at ~/.local/bin/git-relax"
-    echo "🔗 Symlink created at ~/.local/bin/git-r"
 else
     echo "🎉 Script has been created at ~/.local/bin/git-relax"
-    echo "🔗 Symlink created at ~/.local/bin/git-r"
 fi
