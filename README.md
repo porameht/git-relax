@@ -14,6 +14,11 @@ A smart Git workflow assistant that helps standardize commit messages and PR des
 
 ## 🚀 Installation
 
+Add export script
+```bash
+PATH=$PATH:~/.local/bin in ~/.bashrc or ~/.zshrc
+```
+
 Clone the repository
 ```bash
 git clone https://github.com/yourusername/git-relax.git
