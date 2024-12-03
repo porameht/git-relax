@@ -57,20 +57,12 @@ echo 'export PATH=$PATH:~/.local/bin' >> ~/.zshrc
 
 ### Commit Messages
 ```bash
-# Full command
 git-relax commit
-
-# Shorthand
-git-r commit
 ```
 
 ### Create Pull Requests
 ```bash
-# Full command
 git-relax pr
-
-# Shorthand
-git-r pr
 ```
 
 ## 🛠 Customization
@@ -87,19 +79,6 @@ git-r pr
 - `perf`: Performance enhancements
 - `test`: Test-related changes
 
-### Prompt Customization
-
-Modify `~/.config/git-relax/config.sh` to customize AI prompts:
-
-```bash
-# Example commit message prompt
-COMMIT_PROMPT_CUSTOM="Generate a commit message that:
-1. Follows our team's prefix convention
-2. Describes changes concisely
-3. Includes relevant context
-4. Adheres to our coding standards"
-```
-
 ## 📋 Pull Request Template
 
 Generated PRs follow a structured format:
@@ -114,9 +93,9 @@ Generated PRs follow a structured format:
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit using `git-r commit`
+3. Commit using `git-relax commit`
 4. Push your changes
-5. Create PR using `git-r pr`
+5. Create PR using `git-relax pr`
 
 ## 📄 License
 
