@@ -412,12 +412,15 @@ apis:
         max-input-chars: 384000
   openrouter:
     base-url: https://openrouter.ai/api/v1
-    api-key: 
+    api-key: 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
     api-key-env: OPENROUTER_API_KEY
     models:
       google/gemini-2.0-flash-001:
         aliases: ["google/gemini-2.0-flash-001"]
         max-input-chars: 4194304
-      google/gemini-2.0-flash-lite:
-        aliases: ["google/gemini-2.0-flash-lite"]
+      anthropic/claude-3.7-sonnet:
+       	aliases: ["anthropic/claude-3.7-sonnet"]
+        max-input-chars: 680000
+      google/gemini-2.5-pro-preview-03-25:
+        aliases: ["google/gemini-2.5-pro-preview-03-25"]
         max-input-chars: 4194304
