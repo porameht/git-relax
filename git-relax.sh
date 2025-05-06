@@ -185,7 +185,7 @@ $changes"
 }
 
 # Main script execution starts here
-if [ "$1" = "commit" ]; then
+if [ "$1" = "cm" ]; then
     generate_commit_message
 elif [ "$1" = "pr" ]; then
     generate_pr_info
