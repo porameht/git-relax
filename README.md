@@ -2,6 +2,10 @@
 
 A smart Git workflow assistant that standardizes commit messages and pull request descriptions using AI-powered suggestions and conventional commit formats.
 
+`
+export PATH="$HOME/.local/bin:$PATH"
+`
+
 ## 🌟 Features
 
 - **Intelligent Commit Messages**: Generate well-formatted commits following industry standards
