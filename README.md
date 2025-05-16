@@ -47,7 +47,8 @@ export OPENAI_API_KEY='your_openai_api_key'
 ```bash
 git clone https://github.com/yourusername/git-relax.git
 cd git-relax
-./install.sh
+chmod +x git-relax.sh
+cp git-relax.sh ~/.local/bin/git-relax
 ```
 
 4. Add to PATH
@@ -61,7 +62,7 @@ echo 'export PATH=$PATH:~/.local/bin' >> ~/.zshrc
 
 ### Commit Messages
 ```bash
-git-relax commit
+git-relax cm
 ```
 
 ### Create Pull Requests
@@ -97,7 +98,7 @@ Generated PRs follow a structured format:
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit using `git-relax commit`
+3. Commit using `git-relax cm`
 4. Push your changes
 5. Create PR using `git-relax pr`
 
