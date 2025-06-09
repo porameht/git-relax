@@ -1,14 +1,11 @@
 #!/bin/bash
 
-# Exit on error
 set -e
 
-# Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Check for required commands
 for cmd in git gum gh mods; do
     if ! command_exists "$cmd"; then
         echo "🚨 $cmd is not installed."
@@ -16,12 +13,10 @@ for cmd in git gum gh mods; do
     fi
 done
 
-# Get the default branch from the remote repository
 get_default_branch() {
     git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
 }
 
-# Generate mods rules for commit message formatting
 get_commit_rules() {
     local scope="$1"
     local breaking_change="$2"
@@ -68,21 +63,18 @@ get_pr_rules() {
   - content: concise PR title describing main change
   - style: start with lowercase verb"
             ;;
-        "problems")
-            echo "task: describe PR problem
+        "objective")
+            echo "task: summarize the main objective of this change
 style:
-  - brief
-  - clear"
+  - brief summary
+  - clear purpose"
             ;;
-        "solutions")
-            echo "task: describe solution
-output: solution only"
-            ;;
-        "changes")
-            echo "task: list main changes
+        "changelog")
+            echo "task: list main changes as bullet points
 style:
   - use present-tense verbs
-  - specific but concise"
+  - specific but concise
+  - format as bullet points"
             ;;
     esac
 }
@@ -105,21 +97,26 @@ generate_pr_info() {
 
     gum style --foreground 212 "🔨 Generating PR body..."
 
-    local problems=$(git diff "$default_branch".. | mods "$(get_pr_rules "problems")" | tr '[:upper:]' '[:lower:]')
-    local solutions=$(git diff "$default_branch".. | mods "$(get_pr_rules "solutions")" | tr '[:upper:]' '[:lower:]')
-    local changes=$(git diff "$default_branch".. | mods "$(get_pr_rules "changes")" | tr '[:upper:]' '[:lower:]')
+    local objective=$(git diff "$default_branch".. | mods "$(get_pr_rules "objective")" | tr '[:upper:]' '[:lower:]')
+    local jira_ticket=$(gum input --placeholder "Enter Jira Ticket URL (optional)")
+    local changelog=$(git diff "$default_branch".. | mods "$(get_pr_rules "changelog")")
+    local deployment_dependency=$(gum input --placeholder "Enter deployment dependencies (optional)")
 
-    pr_body="### Problems
+    pr_body="## Objective
+${objective}
 
-$problems
+## Jira Ticket
+${jira_ticket:-"(JIRA Ticket URL)"}
 
-### Solutions
+## Change logs
+${changelog}
 
-$solutions
+## Deployment Dependency
+${deployment_dependency:-"(e.g. Depends on other Jira Tasks)"}
 
-### Changes
+## Test / Snapshots
 
-$changes"
+(Your images & test description here)"
 
     echo "🔨 Previewing Pull Request:" | gum format
     echo "Title: $pr_title" | gum format
