@@ -79,6 +79,88 @@ style:
   - specific but concise
   - format as bullet points"
             ;;
+        "review")
+            echo "Perform a comprehensive code review with actionable suggestions:
+
+ANALYSIS REQUIREMENTS:
+- Analyze code quality, security, performance, maintainability
+- Check for best practices, potential bugs, and architectural issues
+- Review error handling, input validation, and resource management
+- Examine code patterns, naming conventions, and documentation
+- Apply KISS principle (Keep It Simple, Stupid) - prioritize simplicity and readability
+- Identify overcomplicated logic that can be simplified
+- Check for unnecessary abstractions or complex patterns
+
+OUTPUT FORMAT:
+✅ **Strengths**
+- List positive aspects with specific examples from the code
+- Highlight good practices being followed
+
+⚠️ **Issues & Suggestions** 
+- For each issue, provide:
+  1. **Problem**: Clear description of the issue
+  2. **Why**: Explain why this is problematic (security, performance, maintainability)
+  3. **Solution**: Show exact code example of the fix
+  4. **Benefit**: Explain what improvement this brings
+
+💡 **Recommendations**
+- Suggest broader improvements with examples
+- Include best practices not currently implemented
+- Provide specific implementation guidance
+- Recommend simplifications following KISS principle
+- Suggest refactoring complex functions into smaller, focused ones
+- Identify opportunities to reduce cognitive complexity
+
+EXAMPLE FORMAT for Issues:
+
+**Security Issue Example:**
+**Problem**: Missing input validation in user registration
+**Why**: This allows malicious data to enter the system, potentially causing XSS or injection attacks
+**Solution**: 
+\`\`\`python
+# Before
+def register_user(username, email):
+    user = User(username=username, email=email)
+    
+# After  
+def register_user(username, email):
+    if not username or len(username) < 3:
+        raise ValueError('Username must be at least 3 characters')
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+        raise ValueError('Invalid email format')
+    user = User(username=username, email=email)
+\`\`\`
+**Benefit**: Prevents invalid data from entering the system and provides clear error messages
+
+**KISS Principle Example:**
+**Problem**: Overcomplicated conditional logic that's hard to read
+**Why**: Complex nested conditions violate KISS principle, making code harder to understand and maintain
+**Solution**: 
+\`\`\`python
+# Before (Complex)
+def process_user(user):
+    if user.is_active and (user.subscription_type == 'premium' or (user.subscription_type == 'basic' and user.credits > 0)) and not user.is_suspended:
+        return handle_active_user(user)
+    else:
+        return handle_inactive_user(user)
+
+# After (Simple & Clear)
+def process_user(user):
+    if not user.is_active or user.is_suspended:
+        return handle_inactive_user(user)
+    
+    has_access = (user.subscription_type == 'premium' or 
+                  (user.subscription_type == 'basic' and user.credits > 0))
+    
+    if has_access:
+        return handle_active_user(user)
+    else:
+        return handle_inactive_user(user)
+\`\`\`
+**Benefit**: Code is easier to read, understand, and debug. Each condition is clear and testable.
+
+Be specific, actionable, and educational in your review."
+            ;;
     esac
 }
 
@@ -135,10 +217,66 @@ ${deployment_dependency:-"(e.g. Depends on other Jira Tasks)"}
     echo "Body: $pr_body" | gum format
 
     if gum confirm "🔨 Do you want to push this PR now?"; then
-        gh pr create \
+        local pr_url
+        pr_url=$(gh pr create \
             --title "$pr_title" \
-            --body "$pr_body"
+            --body "$pr_body")
+        
         echo "Pull Request has been created!" | gum format
+        echo "🔗 $pr_url" | gum format
+        
+        # เพิ่มเมนูถาม review หลังสร้าง PR เสร็จ
+        echo ""
+        if gum confirm "🔍 ต้องการให้ AI review โค้ดใน PR นี้ต่อเลยหรือไม่?"; then
+            echo ""
+            gum style --foreground 212 "🔄 เริ่มต้น AI Code Review..."
+            
+            # ดึง PR number จาก URL ที่ได้
+            local pr_number
+            pr_number=$(echo "$pr_url" | grep -o '[0-9]\+$')
+            generate_code_review "$pr_number"
+        fi
+    fi
+}
+
+generate_code_review() {
+    local pr_number="$1"
+    local default_branch
+    default_branch=$(get_default_branch)
+
+    # ถ้าไม่ได้ระบุ PR number ให้ใช้ current PR
+    if [ -z "$pr_number" ]; then
+        pr_number=$(gh pr view --json number --jq '.number' 2>/dev/null)
+        if [ -z "$pr_number" ]; then
+            echo "🚨 ไม่พบ PR ในสาขาปัจจุบัน กรุณาระบุ PR number หรือสร้าง PR ก่อน"
+            return 1
+        fi
+    fi
+
+    gum style --foreground 212 "🔍 กำลังวิเคราะห์โค้ดใน PR #$pr_number..."
+
+    # ดึงข้อมูล PR
+    local pr_title=$(gh pr view "$pr_number" --json title --jq '.title')
+    echo "📋 PR: $pr_title"
+
+    # วิเคราะห์โค้ดด้วย AI
+    local review_comment
+    review_comment=$(git diff "$default_branch".. | mods "$(get_pr_rules "review")")
+
+    echo ""
+    echo "🔍 AI Code Review:" | gum format
+    echo "$review_comment" | gum format
+
+    if gum confirm "💬 ต้องการส่ง review comment นี้ไปที่ PR หรือไม่?"; then
+        gh pr comment "$pr_number" --body "$review_comment"
+        echo "✅ ส่ง review comment เรียบร้อยแล้ว!" | gum format
+    elif gum confirm "📝 ต้องการแก้ไข comment ก่อนส่งหรือไม่?"; then
+        local custom_comment
+        custom_comment=$(gum write --placeholder "แก้ไข review comment ตามต้องการ..." --value "$review_comment")
+        if [ -n "$custom_comment" ]; then
+            gh pr comment "$pr_number" --body "$custom_comment"
+            echo "✅ ส่ง review comment เรียบร้อยแล้ว!" | gum format
+        fi
     fi
 }
 
@@ -146,6 +284,12 @@ if [ "$1" = "cm" ]; then
     generate_commit_message
 elif [ "$1" = "pr" ]; then
     generate_pr_info
+elif [ "$1" = "rv" ]; then
+    generate_code_review "$2"
 else
-    echo "🚨 Invalid command. Usage: git-relax cm|pr"
+    echo "🚨 Invalid command. Usage:"
+    echo "  git-relax cm           - Generate commit message"
+    echo "  git-relax pr           - Create pull request"
+    echo "  git-relax rv [PR#]     - Review code and comment on PR"
+    echo "                          (if PR# not specified, uses current PR)"
 fi
