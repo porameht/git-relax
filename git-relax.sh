@@ -285,15 +285,77 @@ generate_code_review() {
     fi
 }
 
+get_valid_comment_lines() {
+    local file="$1"
+    local default_branch="$2"
+    
+    # หา ALL lines ที่สามารถ comment ได้ใน GitHub PR diff:
+    # 1. Added lines (+ lines) - บรรทัดที่เพิ่มใหม่
+    # 2. Context lines (" " lines) - บรรทัดที่ไม่เปลี่ยนแต่อยู่ใน diff context
+    # ❌ ไม่รวม Deleted lines (- lines) เพราะไม่มีในไฟล์ใหม่
+    git diff "$default_branch".."HEAD" -- "$file" | awk '
+        BEGIN { 
+            in_hunk = 0
+            new_line_current = 0
+        }
+        /^@@/ {
+            # Parse hunk header: @@ -old_start,old_count +new_start,new_count @@
+            # Extract new file starting line number
+            if (match($0, /\+([0-9]+)/)) {
+                new_line_current = substr($0, RSTART+1, RLENGTH-1)
+                in_hunk = 1
+            }
+            next
+        }
+        in_hunk && /^[+]/ && !/^\+\+\+/ {
+            # Added line - สามารถ comment ได้
+            print new_line_current ":ADDED:" substr($0, 2)
+            new_line_current++
+        }
+        in_hunk && /^[ ]/ {
+            # Context line - สามารถ comment ได้เช่นกัน
+            print new_line_current ":CONTEXT:" substr($0, 2)
+            new_line_current++
+        }
+        in_hunk && /^[-]/ && !/^---/ {
+            # Deleted line - ไม่สามารถ comment ได้ และไม่ increment new_line_current
+            # เพราะบรรทัดนี้ไม่มีในไฟล์ใหม่
+        }
+    '
+}
+
+validate_line_in_diff() {
+    local file="$1"
+    local line_num="$2"
+    local default_branch="$3"
+    
+    # ตรวจสอบว่า line number นี้อยู่ในรายการ valid lines หรือไม่
+    # format ใหม่: line_number:TYPE:content
+    local valid_lines
+    valid_lines=$(get_valid_comment_lines "$file" "$default_branch")
+    
+    if echo "$valid_lines" | grep -q "^$line_num:"; then
+        # แสดงประเภทของ line ที่ validate
+        local line_type
+        line_type=$(echo "$valid_lines" | grep "^$line_num:" | cut -d':' -f2 | head -1)
+        if [ "$line_type" = "ADDED" ]; then
+            echo "    🎯 Line $line_num is valid (NEWLY ADDED)" >&2
+        else
+            echo "    📝 Line $line_num is valid (CONTEXT)" >&2
+        fi
+        return 0  # Valid
+    else
+        return 1  # Invalid
+    fi
+}
+
 generate_inline_comments() {
     local pr_number="$1"
     local default_branch="$2"
 
-    gum style --foreground 212 "🎯 สร้าง true inline comments..."
+    gum style --foreground 212 "🎯 สร้าง smart inline comments..."
 
-    # ดึงข้อมูล PR และ commit SHA
-    local commit_sha
-    commit_sha=$(gh pr view "$pr_number" --json headRefOid --jq '.headRefOid')
+    # ไม่ต้องใช้ commit SHA สำหรับ Reviews API
     
     # ดึงรายการไฟล์ที่เปลี่ยนแปลงจาก git diff
     local changed_files
@@ -306,7 +368,6 @@ generate_inline_comments() {
 
     echo "📁 ไฟล์ที่เปลี่ยนแปลง:"
     echo "$changed_files" | gum format
-    echo "📝 Commit SHA: $commit_sha" | gum format
 
     # สร้าง array สำหรับเก็บ inline comments
     local -a inline_comments=()
@@ -316,28 +377,69 @@ generate_inline_comments() {
         if [ -f "$file" ]; then
             echo "🔍 วิเคราะห์ไฟล์: $file" | gum format
             
-            # ดึง diff พร้อม line numbers ที่ถูกต้อง
-            local file_diff
-            file_diff=$(git diff "$default_branch".."HEAD" -- "$file")
+            # หาเฉพาะ lines ที่เปลี่ยนแปลงและสามารถ comment ได้ใน GitHub
+            local valid_lines
+            valid_lines=$(get_valid_comment_lines "$file" "$default_branch")
             
-            if [ -n "$file_diff" ]; then
-                # ให้ AI วิเคราะห์และสร้าง comments สำหรับบรรทัดที่เปลี่ยน
-                local ai_response
-                ai_response=$(echo "$file_diff" | mods "Analyze this git diff for file: $file
+            if [ -n "$valid_lines" ]; then
+                lines_count=$(echo "$valid_lines" | wc -l)
+                echo "  📊 Found $lines_count valid comment lines" | gum format
+                echo "  🎯 Valid lines for comments:" | gum format
+                echo "$valid_lines" | head -5 | while IFS= read -r line; do
+                    line_num=$(echo "$line" | cut -d':' -f1)
+                    line_type=$(echo "$line" | cut -d':' -f2)
+                    content=$(echo "$line" | cut -d':' -f3- | head -c 50)
+                    if [ "$line_type" = "ADDED" ]; then
+                        echo "    ✅ Line $line_num (NEW): $content..."
+                    else
+                        echo "    📝 Line $line_num (CONTEXT): $content..."
+                    fi
+                done | gum format
+                
+                # สร้าง context ให้ AI โดยแสดงเฉพาะ lines ที่เปลี่ยน
+                local diff_context
+                diff_context=$(git diff "$default_branch".."HEAD" -- "$file")
+                
+                # สร้างรายการ valid line numbers ที่ AI สามารถใช้ได้
+                local valid_line_numbers
+                valid_line_numbers=$(echo "$valid_lines" | cut -d':' -f1 | sort -n | uniq)
+                
+                # แยกประเภทของ lines เพื่อให้ AI เข้าใจดีขึ้น
+                local added_lines_preview
+                local context_lines_preview
+                added_lines_preview=$(echo "$valid_lines" | grep ":ADDED:" | head -8 | while IFS= read -r line; do
+                    line_num=$(echo "$line" | cut -d':' -f1)
+                    content=$(echo "$line" | cut -d':' -f3-)
+                    echo "  Line $line_num: $content"
+                done)
+                
+                context_lines_preview=$(echo "$valid_lines" | grep ":CONTEXT:" | head -5 | while IFS= read -r line; do
+                    line_num=$(echo "$line" | cut -d':' -f1)
+                    content=$(echo "$line" | cut -d':' -f3-)
+                    echo "  Line $line_num: $content"
+                done)
+                
+                # ให้ AI วิเคราะห์โดยใช้ข้อมูล valid lines เท่านั้น
+                local ai_prompt="Analyze this git diff for file: $file
 
-Provide inline code review suggestions for changed lines only.
-Focus on critical issues: Security, Performance, KISS principle, Best practices.
+🎯 VALID LINES FOR COMMENTS (must use only these line numbers):
+$(echo "$valid_line_numbers" | head -20)
+
+📝 NEWLY ADDED LINES (focus here for reviews):
+$added_lines_preview
+
+📄 CONTEXT LINES (can also comment but less priority):
+$context_lines_preview
+
+⚠️ CRITICAL: Only comment on line numbers listed in VALID LINES above!
+Focus on: Security, Performance, KISS principle, Best practices.
 
 OUTPUT FORMAT: For each issue, output exactly:
 LINE_NUMBER:COMMENT_TEXT
 
-Where:
-- LINE_NUMBER: exact new line number from the diff (+ lines only)
-- COMMENT_TEXT: concise suggestion with code example if helpful (max 200 chars)
-
 RULES:
-- Only comment on lines that have + (additions) in the diff
-- Use NEW line numbers (right side of diff)  
+- LINE_NUMBER must be from VALID LINES list only
+- Keep comments under 200 characters
 - Include specific improvement suggestions
 - Reference variable/function names from the code
 - If no issues found, output: NO_ISSUES_FOUND
@@ -345,24 +447,35 @@ RULES:
 EXAMPLES:
 25:🔒 Use parameterized queries: \`cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))\`
 42:⚡ Use list comprehension: \`active_users = [u for u in users if u.active]\`
-15:🎯 Simplify: \`return not user.active\` instead of if/else")
+15:🎯 Simplify: \`return not user.active\` instead of if/else"
+
+                local ai_response
+                ai_response=$(echo "$diff_context" | mods "$ai_prompt")
 
                 if [ -n "$ai_response" ] && [ "$ai_response" != "NO_ISSUES_FOUND" ]; then
                     echo "  🤖 AI found $(echo "$ai_response" | wc -l) suggestions" | gum format
                     
-                    # แปลง AI response เป็น inline comments array
+                    # แปลง AI response เป็น inline comments array พร้อม validation
                     while IFS= read -r line; do
                         if [[ "$line" =~ ^[0-9]+:.+ ]]; then
                             local line_num=$(echo "$line" | cut -d':' -f1)
                             local comment_text=$(echo "$line" | cut -d':' -f2-)
                             
-                            inline_comments+=("$file:$line_num:$comment_text:$commit_sha")
-                            echo "  📝 Valid comment: $file:$line_num" | gum format
+                            # ตรวจสอบว่า line number นี้ valid จริงหรือไม่
+                            if validate_line_in_diff "$file" "$line_num" "$default_branch"; then
+                                inline_comments+=("$file:$line_num:$comment_text")
+                                echo "  ✅ Valid comment: $file:$line_num" | gum format
+                            else
+                                echo "  ❌ REJECTED: $file:$line_num (not in valid diff lines)" | gum format
+                                echo "     AI tried to comment on invalid line - this would cause GitHub API error" | gum format
+                            fi
                         fi
                     done <<< "$ai_response"
                 else
                     echo "  ✅ No issues found in $file" | gum format
                 fi
+            else
+                echo "  📝 No valid comment lines in $file" | gum format
             fi
         fi
     done <<< "$changed_files"
@@ -394,56 +507,86 @@ EXAMPLES:
 
         echo "🚀 กำลังส่ง ${#inline_comments[@]} inline comments..." | gum format
         
-        # ส่งแต่ละ comment ผ่าน GitHub API
-        local success_count=0
+        # ใช้ GitHub Reviews API แบบ batch เท่านั้น - เรียบง่ายและมีประสิทธิภาพสูงสุด
+        echo "🚀 Creating batch review with ${#inline_comments[@]} inline comments..."
+        
+        # สร้าง JSON array สำหรับ comments โดยใช้ jq (format ใหม่: file:line:comment)
+        comments_array="[]"
         for comment in "${inline_comments[@]}"; do
-            local file_path=$(echo "$comment" | cut -d':' -f1)
-            local line_num=$(echo "$comment" | cut -d':' -f2)
-            local comment_text=$(echo "$comment" | cut -d':' -f3)
-            local commit_id=$(echo "$comment" | cut -d':' -f4)
+            file_path=$(echo "$comment" | cut -d':' -f1)
+            line_num=$(echo "$comment" | cut -d':' -f2)
+            comment_text=$(echo "$comment" | cut -d':' -f3-)
             
-            echo "📍 Creating inline comment: $file_path:$line_num" | gum format
+            echo "  📝 Adding comment: $file_path:$line_num" | gum format
             
-            # สร้าง JSON payload สำหรับ GitHub API
-            local json_payload
-            json_payload=$(jq -n \
-                --arg body "$comment_text" \
-                --arg commit_id "$commit_id" \
+            # เพิ่ม comment เข้าไปใน array
+            comments_array=$(echo "$comments_array" | jq \
                 --arg path "$file_path" \
                 --arg line "$line_num" \
-                --arg side "RIGHT" \
-                '{
-                    body: $body,
-                    commit_id: $commit_id,
+                --arg body "$comment_text" \
+                '. += [{
                     path: $path,
                     line: ($line | tonumber),
-                    side: $side
-                }')
-            
-            # ส่ง comment ผ่าน GitHub API
-            if gh api \
-                "repos/$owner/$repo/pulls/$pr_number/comments" \
-                --method POST \
-                --input - <<< "$json_payload" >/dev/null 2>&1; then
-                echo "  ✅ Inline comment created successfully"
-                ((success_count++))
-            else
-                echo "  ⚠️ Failed to create inline comment, trying with gh pr review..."
-                # Fallback: ใช้ gh pr review
-                if gh pr review "$pr_number" --comment \
-                    --body "$comment_text" \
-                    --file "$file_path" \
-                    --line "$line_num" 2>/dev/null; then
-                    echo "  ✅ Comment created via gh pr review"
-                    ((success_count++))
-                else
-                    echo "  ❌ Failed to create comment"
-                fi
-            fi
+                    body: $body
+                }]')
         done
         
-        echo "✅ สร้าง $success_count/${#inline_comments[@]} inline comments สำเร็จ!" | gum format
-        echo "💡 ดู inline comments ใน Files tab ของ PR" | gum format
+        # ทำให้ JSON เป็น compact format และตรวจสอบความถูกต้อง
+        comments_array=$(echo "$comments_array" | jq -c .)
+        
+        echo "🔍 Preview first 3 comments:" | gum format
+        echo "$comments_array" | jq '.[:3]' | gum format
+        echo ""
+        echo "📦 Sending batch review..." | gum format
+        
+        # ส่ง batch review ด้วย gh api โดยใช้ --raw-field สำหรับ JSON array
+        api_response=$(gh api "repos/$owner/$repo/pulls/$pr_number/reviews" \
+            --method POST \
+            --field body="🤖 **AI Code Review**
+
+✨ ข้อเสนอแนะจาก AI เพื่อปรับปรุงคุณภาพโค้ด
+
+📊 พบ ${#inline_comments[@]} จุดที่สามารถปรับปรุงได้" \
+            --field event="COMMENT" \
+            --raw-field comments="$comments_array" 2>&1)
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ สร้าง batch review สำเร็จ!" | gum format
+            echo "🎯 ${#inline_comments[@]} inline comments ถูกสร้างพร้อมกัน" | gum format
+            success_count=${#inline_comments[@]}
+            batch_method_count=${#inline_comments[@]}
+        else
+            echo "❌ ไม่สามารถสร้าง batch review ได้" | gum format
+            echo "🔍 Error details:" | gum format
+            echo "$api_response" | gum format
+            echo ""
+            echo "💡 สาเหตุที่เป็นไปได้:" | gum format
+            echo "  • Line numbers ไม่อยู่ใน diff (ตรวจสอบ line mapping)" | gum format  
+            echo "  • File paths ไม่ถูกต้อง (ต้องเป็น relative path จาก repo root)" | gum format
+            echo "  • ไม่มีสิทธิ์ write access ใน repository" | gum format
+            echo "  • PR ถูก lock หรือ close แล้ว" | gum format
+            success_count=0
+        fi
+        
+        echo ""
+        echo "📊 Inline Comments Results Summary:" | gum format
+        
+        if [ $success_count -gt 0 ]; then
+            echo "✅ สร้าง $success_count/${#inline_comments[@]} comments สำเร็จ!" | gum format
+            echo ""
+            echo "🚀 ใช้ GitHub Reviews API แบบ batch - วิธีที่ดีที่สุด!" | gum format
+            echo "⚡ ส่งทุก comments พร้อมกันในครั้งเดียว" | gum format
+            echo "🔗 Review จะปรากฏเป็น single review พร้อม inline comments" | gum format
+            echo ""
+            echo "💡 ดู inline comments ใน Files tab ของ PR" | gum format
+        else
+            echo "❌ ไม่สามารถสร้าง inline comments ได้" | gum format
+            echo "🔍 สาเหตุที่เป็นไปได้:" | gum format
+            echo "  • ไม่มีสิทธิ์ write access ใน repository" | gum format
+            echo "  • PR อาจถูก lock หรือ close แล้ว" | gum format
+            echo "  • Line numbers ไม่ตรงกับ current diff" | gum format
+            echo "  • GitHub API มีปัญหาชั่วคราว" | gum format
+        fi
     elif gum confirm "✏️ ต้องการแก้ไข comments ก่อนส่งหรือไม่?"; then
         # สร้าง temporary file สำหรับการแก้ไข
         local temp_file=$(mktemp)
