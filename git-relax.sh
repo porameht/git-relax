@@ -164,6 +164,8 @@ Be specific, actionable, and educational in your review."
     esac
 }
 
+
+
 generate_pr_info() {
     local default_branch
     default_branch=$(get_default_branch)
@@ -259,24 +261,212 @@ generate_code_review() {
     local pr_title=$(gh pr view "$pr_number" --json title --jq '.title')
     echo "📋 PR: $pr_title"
 
-    # วิเคราะห์โค้ดด้วย AI
-    local review_comment
-    review_comment=$(git diff "$default_branch".. | mods "$(get_pr_rules "review")")
+    # เลือกประเภทการ review
+    local review_type
+    review_type=$(gum choose "💬 General Review (PR comment)" "🎯 Inline Comments (True line-specific)" "🔄 ทั้งคู่ (Both)")
 
-    echo ""
-    echo "🔍 AI Code Review:" | gum format
-    echo "$review_comment" | gum format
+    if [[ "$review_type" == *"General"* ]] || [[ "$review_type" == *"ทั้งคู่"* ]]; then
+        # วิเคราะห์โค้ดด้วย AI สำหรับ general review
+        local review_comment
+        review_comment=$(git diff "$default_branch".. | mods "$(get_pr_rules "review")")
 
-    if gum confirm "💬 ต้องการส่ง review comment นี้ไปที่ PR หรือไม่?"; then
-        gh pr comment "$pr_number" --body "$review_comment"
-        echo "✅ ส่ง review comment เรียบร้อยแล้ว!" | gum format
-    elif gum confirm "📝 ต้องการแก้ไข comment ก่อนส่งหรือไม่?"; then
-        local custom_comment
-        custom_comment=$(gum write --placeholder "แก้ไข review comment ตามต้องการ..." --value "$review_comment")
-        if [ -n "$custom_comment" ]; then
-            gh pr comment "$pr_number" --body "$custom_comment"
-            echo "✅ ส่ง review comment เรียบร้อยแล้ว!" | gum format
+        echo ""
+        echo "🔍 AI General Review:" | gum format
+        echo "$review_comment" | gum format
+
+        if gum confirm "💬 ต้องการส่ง general review comment นี้ไปที่ PR หรือไม่?"; then
+            gh pr comment "$pr_number" --body "$review_comment"
+            echo "✅ ส่ง general review comment เรียบร้อยแล้ว!" | gum format
         fi
+    fi
+
+    if [[ "$review_type" == *"Inline"* ]] || [[ "$review_type" == *"ทั้งคู่"* ]]; then
+        generate_inline_comments "$pr_number" "$default_branch"
+    fi
+}
+
+generate_inline_comments() {
+    local pr_number="$1"
+    local default_branch="$2"
+
+    gum style --foreground 212 "🎯 สร้าง true inline comments..."
+
+    # ดึงข้อมูล PR และ commit SHA
+    local commit_sha
+    commit_sha=$(gh pr view "$pr_number" --json headRefOid --jq '.headRefOid')
+    
+    # ดึงรายการไฟล์ที่เปลี่ยนแปลงจาก git diff
+    local changed_files
+    changed_files=$(git diff --name-only "$default_branch"..)
+
+    if [ -z "$changed_files" ]; then
+        echo "🚨 ไม่พบไฟล์ที่เปลี่ยนแปลง"
+        return 1
+    fi
+
+    echo "📁 ไฟล์ที่เปลี่ยนแปลง:"
+    echo "$changed_files" | gum format
+    echo "📝 Commit SHA: $commit_sha" | gum format
+
+    # สร้าง array สำหรับเก็บ inline comments
+    local -a inline_comments=()
+    
+    # วิเคราะห์แต่ละไฟล์และสร้าง line-specific comments
+    while IFS= read -r file; do
+        if [ -f "$file" ]; then
+            echo "🔍 วิเคราะห์ไฟล์: $file" | gum format
+            
+            # ดึง diff พร้อม line numbers ที่ถูกต้อง
+            local file_diff
+            file_diff=$(git diff "$default_branch".."HEAD" -- "$file")
+            
+            if [ -n "$file_diff" ]; then
+                # ให้ AI วิเคราะห์และสร้าง comments สำหรับบรรทัดที่เปลี่ยน
+                local ai_response
+                ai_response=$(echo "$file_diff" | mods "Analyze this git diff for file: $file
+
+Provide inline code review suggestions for changed lines only.
+Focus on critical issues: Security, Performance, KISS principle, Best practices.
+
+OUTPUT FORMAT: For each issue, output exactly:
+LINE_NUMBER:COMMENT_TEXT
+
+Where:
+- LINE_NUMBER: exact new line number from the diff (+ lines only)
+- COMMENT_TEXT: concise suggestion with code example if helpful (max 200 chars)
+
+RULES:
+- Only comment on lines that have + (additions) in the diff
+- Use NEW line numbers (right side of diff)  
+- Include specific improvement suggestions
+- Reference variable/function names from the code
+- If no issues found, output: NO_ISSUES_FOUND
+
+EXAMPLES:
+25:🔒 Use parameterized queries: \`cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))\`
+42:⚡ Use list comprehension: \`active_users = [u for u in users if u.active]\`
+15:🎯 Simplify: \`return not user.active\` instead of if/else")
+
+                if [ -n "$ai_response" ] && [ "$ai_response" != "NO_ISSUES_FOUND" ]; then
+                    echo "  🤖 AI found $(echo "$ai_response" | wc -l) suggestions" | gum format
+                    
+                    # แปลง AI response เป็น inline comments array
+                    while IFS= read -r line; do
+                        if [[ "$line" =~ ^[0-9]+:.+ ]]; then
+                            local line_num=$(echo "$line" | cut -d':' -f1)
+                            local comment_text=$(echo "$line" | cut -d':' -f2-)
+                            
+                            inline_comments+=("$file:$line_num:$comment_text:$commit_sha")
+                            echo "  📝 Valid comment: $file:$line_num" | gum format
+                        fi
+                    done <<< "$ai_response"
+                else
+                    echo "  ✅ No issues found in $file" | gum format
+                fi
+            fi
+        fi
+    done <<< "$changed_files"
+
+    # แสดง preview ของ inline comments
+    echo ""
+    echo "🎯 Inline Comments Preview:" | gum format
+    if [ ${#inline_comments[@]} -eq 0 ]; then
+        echo "✅ ไม่พบ issues ที่ต้องการ inline comments" | gum format
+        return 0
+    fi
+
+    for comment in "${inline_comments[@]}"; do
+        local file_path=$(echo "$comment" | cut -d':' -f1)
+        local line_num=$(echo "$comment" | cut -d':' -f2)
+        local comment_text=$(echo "$comment" | cut -d':' -f3)
+        
+        echo "📍 $file_path:$line_num" | gum format
+        echo "   $comment_text" | gum format
+        echo ""
+    done
+
+    if gum confirm "🎯 ต้องการส่ง inline comments เหล่านี้ไปที่ PR หรือไม่?"; then
+        # ดึงข้อมูล repository
+        local repo_info
+        repo_info=$(gh repo view --json owner,name --jq '{owner: .owner.login, name: .name}')
+        local owner=$(echo "$repo_info" | jq -r '.owner')
+        local repo=$(echo "$repo_info" | jq -r '.name')
+
+        echo "🚀 กำลังส่ง ${#inline_comments[@]} inline comments..." | gum format
+        
+        # ส่งแต่ละ comment ผ่าน GitHub API
+        local success_count=0
+        for comment in "${inline_comments[@]}"; do
+            local file_path=$(echo "$comment" | cut -d':' -f1)
+            local line_num=$(echo "$comment" | cut -d':' -f2)
+            local comment_text=$(echo "$comment" | cut -d':' -f3)
+            local commit_id=$(echo "$comment" | cut -d':' -f4)
+            
+            echo "📍 Creating inline comment: $file_path:$line_num" | gum format
+            
+            # สร้าง JSON payload สำหรับ GitHub API
+            local json_payload
+            json_payload=$(jq -n \
+                --arg body "$comment_text" \
+                --arg commit_id "$commit_id" \
+                --arg path "$file_path" \
+                --arg line "$line_num" \
+                --arg side "RIGHT" \
+                '{
+                    body: $body,
+                    commit_id: $commit_id,
+                    path: $path,
+                    line: ($line | tonumber),
+                    side: $side
+                }')
+            
+            # ส่ง comment ผ่าน GitHub API
+            if gh api \
+                "repos/$owner/$repo/pulls/$pr_number/comments" \
+                --method POST \
+                --input - <<< "$json_payload" >/dev/null 2>&1; then
+                echo "  ✅ Inline comment created successfully"
+                ((success_count++))
+            else
+                echo "  ⚠️ Failed to create inline comment, trying with gh pr review..."
+                # Fallback: ใช้ gh pr review
+                if gh pr review "$pr_number" --comment \
+                    --body "$comment_text" \
+                    --file "$file_path" \
+                    --line "$line_num" 2>/dev/null; then
+                    echo "  ✅ Comment created via gh pr review"
+                    ((success_count++))
+                else
+                    echo "  ❌ Failed to create comment"
+                fi
+            fi
+        done
+        
+        echo "✅ สร้าง $success_count/${#inline_comments[@]} inline comments สำเร็จ!" | gum format
+        echo "💡 ดู inline comments ใน Files tab ของ PR" | gum format
+    elif gum confirm "✏️ ต้องการแก้ไข comments ก่อนส่งหรือไม่?"; then
+        # สร้าง temporary file สำหรับการแก้ไข
+        local temp_file=$(mktemp)
+        
+        # เขียน comments ลง temp file
+        for comment in "${inline_comments[@]}"; do
+            local file_path=$(echo "$comment" | cut -d':' -f1)
+            local line_num=$(echo "$comment" | cut -d':' -f2)
+            local comment_text=$(echo "$comment" | cut -d':' -f3)
+            echo "$file_path:$line_num:$comment_text" >> "$temp_file"
+        done
+        
+        # ให้ user แก้ไข
+        local edited_comments
+        edited_comments=$(gum write --value "$(cat "$temp_file")" --placeholder "แก้ไข inline comments (format: file:line:comment)")
+        
+        if [ -n "$edited_comments" ]; then
+            echo "🚀 Processing edited comments..."
+            # TODO: ประมวลผล edited comments (similar logic as above)
+            echo "✅ Feature สำหรับแก้ไข comments จะเพิ่มในเวอร์ชันต่อไป" | gum format
+        fi
+        
+        rm -f "$temp_file"
     fi
 }
 
@@ -290,6 +480,6 @@ else
     echo "🚨 Invalid command. Usage:"
     echo "  git-relax cm           - Generate commit message"
     echo "  git-relax pr           - Create pull request"
-    echo "  git-relax rv [PR#]     - Review code and comment on PR"
+    echo "  git-relax rv [PR#]     - Review code with AI (general/inline)"
     echo "                          (if PR# not specified, uses current PR)"
 fi
