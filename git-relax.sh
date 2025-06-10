@@ -59,9 +59,12 @@ get_pr_rules() {
     
     case "$rule_type" in
         "title")
-            echo "rules:
-  - content: concise PR title describing main change
-  - style: start with lowercase verb"
+            echo "Generate a complete PR title with prefix (max 50 chars):
+  - format: <type>(<scope>): <description>
+  - types: fix/feat/docs/style/refactor/test/chore/build/ci/perf/revert
+  - scope: brief area of change (optional)
+  - description: start with lowercase verb
+  - example: 'feat(auth): add user login validation' or 'fix: resolve memory leak issue'"
             ;;
         "objective")
             echo "task: summarize the main objective of this change
@@ -83,17 +86,26 @@ generate_pr_info() {
     local default_branch
     default_branch=$(get_default_branch)
 
-    local type scope pr_title_prefix pr_summary pr_body
+    local pr_title pr_body choice
 
-    type=$(gum choose "fix" "feat" "docs" "style" "refactor" "test" "chore" "revert")
-    scope=$(gum input --placeholder "scope")
-    [ -n "$scope" ] && scope="($scope)"
+    choice=$(gum choose "🤖 AI คิดให้ (Auto generate)" "👨‍💻 เลือกเอง (Manual select)")
 
-    pr_title_prefix="$type$scope"
-
-    gum style --foreground 212 "Generating PR title..."
-    pr_summary=$(git diff "$default_branch".. | mods "$(get_pr_rules "title")" | tr '[:upper:]' '[:lower:]')
-    pr_title="$pr_title_prefix: $pr_summary"
+    if [[ "$choice" == *"AI คิดให้"* ]]; then
+        gum style --foreground 212 "🤖 AI กำลังสร้าง PR title..."
+        pr_title=$(git diff "$default_branch".. | mods "$(get_pr_rules "title")" | tr '[:upper:]' '[:lower:]')
+    else
+        local type scope pr_title_prefix pr_summary
+        
+        type=$(gum choose "fix" "feat" "docs" "style" "refactor" "test" "chore" "revert")
+        scope=$(gum input --placeholder "scope (optional)")
+        [ -n "$scope" ] && scope="($scope)"
+        
+        pr_title_prefix="$type$scope"
+        
+        gum style --foreground 212 "👨‍💻 กำลังสร้าง PR title..."
+        pr_summary=$(git diff "$default_branch".. | mods "Generate a short description (no prefix): describe the main change, start with lowercase verb, max 30 chars" | tr '[:upper:]' '[:lower:]')
+        pr_title="$pr_title_prefix: $pr_summary"
+    fi
 
     gum style --foreground 212 "🔨 Generating PR body..."
 
