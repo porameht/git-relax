@@ -77,7 +77,9 @@ style:
 style:
   - use present-tense verbs
   - specific but concise
-  - format as bullet points"
+  - format as bullet points
+  - maximum 5 bullet points only
+  - prioritize most important changes"
             ;;
         "review")
             echo "Perform a comprehensive code review with actionable suggestions:
