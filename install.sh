@@ -148,14 +148,11 @@ install() {
     echo ""
     echo "Next steps:"
     echo "  1. Set up your API key:"
-    echo "     export OPENAI_API_KEY=\"sk-...\""
+    echo "     export OPENROUTER_API_KEY=\"sk-...\"  # recommended"
     echo "     # or"
-    echo "     export ANTHROPIC_API_KEY=\"sk-ant-...\""
+    echo "     export OPENAI_API_KEY=\"sk-...\""
     echo ""
-    echo "  2. For GitHub features, set:"
-    echo "     export GITHUB_TOKEN=\"ghp_...\""
-    echo ""
-    echo "  3. Run: git-relax --help"
+    echo "  2. Run: git-relax --help"
     echo ""
 }
 
