@@ -1,109 +1,113 @@
-# Git-Relax 🚀 
-
-A smart Git workflow assistant that standardizes commit messages and pull request descriptions using AI-powered suggestions and conventional commit formats.
-
-
-## 🌟 Features
-
-- **Intelligent Commit Messages**: Generate well-formatted commits following industry standards
-- **AI-Powered PR Creation**: Automatically craft meaningful pull request titles and descriptions
-- **Flexible Message Formats**:
-  - Conventional commit format support
-  - Long-form and concise message options
-  - Customizable prompts for different team needs
-
-## 🔧 Prerequisites
-
-Ensure the following tools are installed:
-
-- Git
-- GitHub CLI (`gh`)
-- Gum
-- Mods (AI command-line tool)
-- OpenAI API Key
-
-### Installation Steps
-
-1. Install Required Tools
-```bash
-# macOS (using Homebrew)
-brew install gh
-brew install charmbracelet/tap/mods
-brew install gum
+```
+   _____ _____ _______   _____  ______ _               __   __
+  / ____|_   _|__   __| |  __ \|  ____| |        /\    \ \ / /
+ | |  __  | |    | |    | |__) | |__  | |       /  \    \ V /
+ | | |_ | | |    | |    |  _  /|  __| | |      / /\ \    > <
+ | |__| |_| |_   | |    | | \ \| |____| |____ / ____ \  / . \
+  \_____|_____|  |_|    |_|  \_\______|______/_/    \_\/_/ \_\
 ```
 
-2. Set Up OpenAI API Key
-- Create an account at OpenAI
-- Generate an API key
-- Set the environment variable:
+AI-powered Git workflow assistant. Generate commit messages, create PRs, and review code - all with AI.
+
+## Installation
+
+### Quick Install (Recommended)
+
 ```bash
-export OPENAI_API_KEY='your_openai_api_key'
+curl -fsSL https://raw.githubusercontent.com/porameht/git-relax/main/install.sh | sh
 ```
 
-3. Clone and Install Git-Relax
+### Cargo
+
 ```bash
-git clone https://github.com/yourusername/git-relax.git
+cargo install git-relax
+```
+
+### From Source
+
+```bash
+git clone https://github.com/porameht/git-relax.git
 cd git-relax
-chmod +x git-relax.sh
-cp git-relax.sh ~/.local/bin/git-relax
+cargo install --path .
 ```
 
-4. Add to PATH
+## Setup
+
 ```bash
-echo 'export PATH=$PATH:~/.local/bin' >> ~/.bashrc
-# Or for zsh users
-echo 'export PATH=$PATH:~/.local/bin' >> ~/.zshrc
+# Set API key (choose one)
+export OPENAI_API_KEY="sk-..."
+# or
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# For GitHub features
+export GITHUB_TOKEN="ghp_..."
 ```
 
-## 🎮 Usage
+Add to `~/.zshrc` or `~/.bashrc` for persistence.
+
+## Usage
+
+```bash
+git-relax              # Interactive menu
+git-relax cm           # Generate commit message
+git-relax pr           # Create pull request
+git-relax rv           # AI code review
+git-relax rv 123       # Review specific PR
+git-relax config       # Check configuration
+```
+
+## Features
 
 ### Commit Messages
+
 ```bash
+git add .
 git-relax cm
 ```
 
-### Create Pull Requests
+- Conventional commits format
+- Breaking change detection
+- AI-generated from staged diff
+
+### Pull Requests
+
 ```bash
 git-relax pr
 ```
 
-## 🛠 Customization
+- Auto-generated title and description
+- Changelog from diff
+- JIRA/issue linking
 
-### Commit Message Types
-- `fix`: Bug fixes and patches
-- `feat`: New features
-- `build`: Build system changes
-- `chore`: Maintenance tasks
-- `ci`: CI configuration updates
-- `docs`: Documentation improvements
-- `style`: Code style modifications
-- `refactor`: Code restructuring
-- `perf`: Performance enhancements
-- `test`: Test-related changes
+### Code Review
 
-## 📋 Pull Request Template
+```bash
+git-relax rv
+```
 
-Generated PRs follow a structured format:
-- Problems addressed
-- Solution approach
-- Implementation details
-- Testing steps
-- Dependency changes
-- Deployment notes
+- Security vulnerability scan
+- Performance suggestions
+- Inline comments on specific lines
 
-## 🤝 Contributing
+## Configuration
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit using `git-relax cm`
-4. Push your changes
-5. Create PR using `git-relax pr`
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `OPENAI_MODEL` | OpenAI model | `gpt-4o-mini` |
+| `ANTHROPIC_MODEL` | Anthropic model | `claude-3-5-haiku-latest` |
+| `GITHUB_TOKEN` | GitHub token | - |
 
-## 📄 License
+## Why Rust?
 
-MIT License - see [LICENSE](LICENSE) file for details.
+| | Before (Bash) | After (Rust) |
+|---|---|---|
+| Dependencies | git, gh, gum, mods, jq | None |
+| Install | 8 steps | 1 command |
+| Binary | ~50KB script | 2.3MB single binary |
+| Platform | Unix only | Windows, macOS, Linux |
 
-## 🙏 Acknowledgments
-- Inspired by conventional commit standards
-- Built for developer productivity
-- Community-driven development
+## License
+
+MIT
