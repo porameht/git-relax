@@ -53,34 +53,30 @@ jobs:
       - name: Build (cross)
         if: matrix.cross
         run: cross build --release --target ${{ matrix.target }}
-        working-directory: git-relax-rs
 
       - name: Build (native)
         if: ${{ !matrix.cross }}
         run: cargo build --release --target ${{ matrix.target }}
-        working-directory: git-relax-rs
 
       - name: Package (Unix)
         if: matrix.archive == 'tar.gz'
         run: |
-          cd git-relax-rs/target/${{ matrix.target }}/release
+          cd target/${{ matrix.target }}/release
           strip git-relax || true
           tar czf ../../../git-relax-${{ matrix.target }}.tar.gz git-relax
-          cd ../../..
 
       - name: Package (Windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          cd git-relax-rs/target/${{ matrix.target }}/release
+          cd target/${{ matrix.target }}/release
           Compress-Archive -Path git-relax.exe -DestinationPath ../../../git-relax-${{ matrix.target }}.zip
-          cd ../../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: git-relax-${{ matrix.target }}
-          path: git-relax-rs/git-relax-${{ matrix.target }}.${{ matrix.archive }}
+          path: git-relax-${{ matrix.target }}.${{ matrix.archive }}
 
   release:
     name: Create Release
@@ -118,5 +114,4 @@ jobs:
 
       - name: Publish
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        working-directory: git-relax-rs
         continue-on-error: true
