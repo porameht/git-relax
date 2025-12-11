@@ -18,6 +18,22 @@ dotenvy = "0.15"
 cliclack = "0.3"
 console = "0.15"
 
+[[bin]]
+name = "git-relax"
+path = "src/main.rs"
+
+[[bin]]
+name = "grl"
+path = "src/main.rs"
+
+[[bin]]
+name = "grlcm"
+path = "src/main.rs"
+
+[[bin]]
+name = "grlpr"
+path = "src/main.rs"
+
 [profile.release]
 strip = true
 lto = true
