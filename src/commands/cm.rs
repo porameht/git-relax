@@ -16,13 +16,15 @@ pub async fn run() -> Result<()> {
     sp.start("Generating commit message...");
 
     let llm = LlmClient::new()?;
-    let message = llm.chat(prompts::COMMIT, &diff).await?.trim().to_lowercase();
+    let message = llm
+        .chat(prompts::COMMIT, &diff)
+        .await?
+        .trim()
+        .to_lowercase();
 
     sp.stop(format!("{} {}", style("Generated:").green(), message));
 
-    let final_msg: String = input("Edit message")
-        .default_input(&message)
-        .interact()?;
+    let final_msg: String = input("Edit message").default_input(&message).interact()?;
 
     if confirm("Commit?").initial_value(true).interact()? {
         let status = Command::new("git")

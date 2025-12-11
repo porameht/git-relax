@@ -56,18 +56,30 @@ impl LlmClient {
             return Err(anyhow!("Set OPENROUTER_API_KEY or OPENAI_API_KEY"));
         };
 
-        Ok(Self { client: Client::new(), api_key, model, base_url })
+        Ok(Self {
+            client: Client::new(),
+            api_key,
+            model,
+            base_url,
+        })
     }
 
     pub async fn chat(&self, system: &str, user: &str) -> Result<String> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(&self.base_url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&ChatRequest {
                 model: self.model.clone(),
                 messages: vec![
-                    Message { role: "system", content: system.into() },
-                    Message { role: "user", content: user.into() },
+                    Message {
+                        role: "system",
+                        content: system.into(),
+                    },
+                    Message {
+                        role: "user",
+                        content: user.into(),
+                    },
                 ],
             })
             .send()
@@ -78,7 +90,9 @@ impl LlmClient {
         }
 
         let result: ChatResponse = resp.json().await?;
-        result.choices.first()
+        result
+            .choices
+            .first()
             .map(|c| c.message.content.clone())
             .ok_or_else(|| anyhow!("No response"))
     }

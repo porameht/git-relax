@@ -18,7 +18,11 @@ pub async fn run(base: Option<String>) -> Result<()> {
     sp.start("Generating PR...");
 
     let llm = LlmClient::new()?;
-    let title = llm.chat(prompts::PR_TITLE, &diff).await?.trim().to_lowercase();
+    let title = llm
+        .chat(prompts::PR_TITLE, &diff)
+        .await?
+        .trim()
+        .to_lowercase();
     let body = llm.chat(prompts::PR_BODY, &diff).await?.trim().to_string();
 
     sp.stop(format!("{}", style("PR generated!").green()));
@@ -31,7 +35,9 @@ pub async fn run(base: Option<String>) -> Result<()> {
         if !has_upstream() {
             let sp = spinner();
             sp.start("Pushing to remote...");
-            let status = Command::new("git").args(["push", "-u", "origin", "HEAD"]).status()?;
+            let status = Command::new("git")
+                .args(["push", "-u", "origin", "HEAD"])
+                .status()?;
             if !status.success() {
                 return Err(anyhow!("git push failed"));
             }
@@ -42,11 +48,16 @@ pub async fn run(base: Option<String>) -> Result<()> {
         sp.start("Creating PR...");
 
         let out = Command::new("gh")
-            .args(["pr", "create", "--title", &title, "--body", &body, "--base", &base])
+            .args([
+                "pr", "create", "--title", &title, "--body", &body, "--base", &base,
+            ])
             .output()?;
 
         if !out.status.success() {
-            return Err(anyhow!("gh pr create failed: {}", String::from_utf8_lossy(&out.stderr)));
+            return Err(anyhow!(
+                "gh pr create failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ));
         }
 
         let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
